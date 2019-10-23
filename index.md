@@ -1,37 +1,52 @@
-## Welcome to GitHub Pages
 
-You can use the [editor on GitHub](https://github.com/linyaqian/axios2..GitHub.io/edit/master/index.md) to maintain and preview the content for your website in Markdown files.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+import axios from 'axios';
+import cookie from 'js-cookie';
+import router from '@/router/index.js'
 
-### Markdown
+import codeDictionary from './statusCodeDictionary'  //状态码字典
+import {MessageBox} from 'element-ui'
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+axios.interceptors.request.use(
+    config => {
+        // 每次发送请求之前判断cookie中是否存在token
+        // 如果存在，则统一在http请求的header都加上token，这样后台根据token判断你的登录情况
+        // 即使本地存在token，也有可能token是过期的，所以在响应拦截器中要对返回状态进行判断
 
-```markdown
-Syntax highlighted code block
+        if (!config.url.includes('/user/login')) {
+            let token = cookie.get('token');
+            if (token) {
+                config.headers['authorization'] = token
+            } else {
+                router.push('/user/login')
+            }
+        } else {
+            delete config.headers.authorization
+        }
+        return config
+    },
+    error => {
+        console.log('请求头拦截报错');
+        return Promise.reject(error);
+    });
 
-# Header 1
-## Header 2
-### Header 3
 
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/linyaqian/axios2..GitHub.io/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+axios.interceptors.response.use(
+    response => {
+        if (response.status === 200) {
+            return Promise.resolve(response);
+        } else {
+            return Promise.reject(response);
+        }
+    },
+    // 服务器状态码不是200的情况
+    error => {
+        MessageBox({
+            title:'登录失败',
+            message: `${codeDictionary[error.response.status]}`,
+            type: 'warning'
+        });
+    }
+);
+export default axios
